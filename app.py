@@ -8,8 +8,13 @@ except ImportError:
 
 from dotenv import load_dotenv
 import os
+import jwt
+import datetime
 
 load_dotenv()
+
+# Secret key for JWT (you should keep this secret and not expose it in your code)
+SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key_here")
 
 app = Flask(__name__)
 CORS(app)  
@@ -20,6 +25,39 @@ try:
     users_collection = db["users"]
 except Exception as e:
     raise ConnectionError(f"Failed to connect to the database: {e}")
+
+# Function to generate JWT token
+def generate_token(user_email):
+    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Token expires in 1 hour
+    token = jwt.encode({"email": user_email, "exp": expiration_time}, SECRET_KEY, algorithm="HS256")
+    return token
+
+# Function to decode and verify JWT token
+def decode_token(token):
+    try:
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return decoded["email"]
+    except jwt.ExpiredSignatureError:
+        return None  # Token has expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
+
+# Function to check for token authorization
+def token_required(f):
+    def wrapper(*args, **kwargs):
+        token = request.headers.get("Authorization")
+        if not token:
+            return jsonify({"message": "Token is missing"}), 403
+
+        # Check if the token is valid
+        email = decode_token(token)
+        if not email:
+            return jsonify({"message": "Invalid or expired token"}), 401
+
+        # Add the email to the request context to be used in the route
+        request.user_email = email
+        return f(*args, **kwargs)
+    return wrapper
 
 @app.route("/signup", methods=["POST"])
 def signup():
