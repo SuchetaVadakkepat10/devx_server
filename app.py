@@ -47,7 +47,7 @@ def signup():
     # Create new user record
     new_user = {
         "email_1": email,  # Matching with your structure
-        "instagram_id_1": instagram_id,  # Matching with your structure
+        "instagram_id": instagram_id,  # Matching with your structure
         "password_text": hashed_password,
     }
 
