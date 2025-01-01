@@ -23,6 +23,7 @@ try:
     db = client["loyalty_program"]
     users_collection = db["users"]
     posts_collection = db["posts"]
+    user_points = db["points"]
 except Exception as e:
     raise ConnectionError(f"Failed to connect to the database: {e}")
 
@@ -120,12 +121,20 @@ def protected():
 def add_post():
     data = request.get_json()
     title = data.get("title")
-    if not title:
-        return jsonify({"message": "Title is required"}), 400
+    user_email = data.get("user_email")
+
+    if not title or not user_email:
+        return jsonify({"message": "Title and User Email are required"}), 400
 
     new_post = {"title": title, "like_score": 0, "liked_by": []}
     try:
         result = posts_collection.insert_one(new_post)
+        # Add points for creating a post
+        user_points.update_one(
+            {"email": user_email},
+            {"$inc": {"points": 10}},
+            upsert=True
+        )
     except Exception as e:
         return jsonify({"message": f"Error adding post: {e}"}), 500
 
@@ -153,6 +162,12 @@ def toggle_like():
         else:
             # Like the post
             liked_by.append(user_email)
+            # Add points for liking a post
+            user_points.update_one(
+                {"email": user_email},
+                {"$inc": {"points": 5}},
+                upsert=True
+            )
 
         like_score = len(liked_by)
 
