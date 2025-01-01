@@ -17,6 +17,7 @@ try:
     client = MongoClient("mongodb+srv://suchetavadakkepat:6EHrFpVzLxvGzgbe@cluster0.kmlv7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
     db = client["loyalty_program"]
     users_collection = db["users"]
+    posts_collection = db["posts"]
 except Exception as e:
     raise ConnectionError(f"Failed to connect to the database: {e}")
 
@@ -78,6 +79,57 @@ def signin():
         return jsonify({"message": "Invalid email or password"}), 401
 
     return jsonify({"message": "Sign-in successful"}), 200
+
+# Add a post (admin use or initialization)
+@app.route("/add_post", methods=["POST"])
+def add_post():
+    data = request.get_json()
+    title = data.get("title")
+    if not title:
+        return jsonify({"message": "Title is required"}), 400
+
+    new_post = {"title": title, "like_score": 0, "liked_by": []}
+    try:
+        result = posts_collection.insert_one(new_post)
+    except Exception as e:
+        return jsonify({"message": f"Error adding post: {e}"}), 500
+
+    return jsonify({"message": "Post added successfully", "post_id": str(result.inserted_id)}), 201
+
+# Toggle like for a post
+@app.route("/toggle_like", methods=["POST"])
+def toggle_like():
+    data = request.get_json()
+    post_id = data.get("post_id")
+    user_email = data.get("user_email")
+
+    if not post_id or not user_email:
+        return jsonify({"message": "Post ID and User Email are required"}), 400
+
+    try:
+        post = posts_collection.find_one({"_id": post_id})
+        if not post:
+            return jsonify({"message": "Post not found"}), 404
+
+        liked_by = post.get("liked_by", [])
+        if user_email in liked_by:
+            # Unlike the post
+            liked_by.remove(user_email)
+        else:
+            # Like the post
+            liked_by.append(user_email)
+
+        like_score = len(liked_by)
+
+        # Update the post in the database
+        posts_collection.update_one(
+            {"_id": post_id},
+            {"$set": {"liked_by": liked_by, "like_score": like_score}}
+        )
+    except Exception as e:
+        return jsonify({"message": f"Error toggling like: {e}"}), 500
+
+    return jsonify({"like_score": like_score}), 200
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
