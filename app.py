@@ -54,6 +54,13 @@ def signup():
 
     try:
         result = users_collection.insert_one(new_user)
+
+        # Add initial points to user_points collection
+        initial_points = {
+            "email": email,
+            "points": 0  # Starting with 0 points
+        }
+        user_points.insert_one(initial_points)
         print(result)
     except Exception as e:
         return jsonify({"message": f"Error saving user: {e}"}), 500
