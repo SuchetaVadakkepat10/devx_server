@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 try:
     from pymongo import MongoClient
     from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,11 +11,12 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-# Secret key for JWT (you should keep this secret and not expose it in your code)
-SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key_here")
-
 app = Flask(__name__)
 CORS(app)  
+
+# JWT Configuration
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "your_secret_key")  # Use a secure key, and preferably load it from env variables
+jwt = JWTManager(app)
 
 try:
     client = MongoClient("mongodb+srv://suchetavadakkepat:6EHrFpVzLxvGzgbe@cluster0.kmlv7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
@@ -55,7 +57,9 @@ def signup():
     except Exception as e:
         return jsonify({"message": f"Error saving user: {e}"}), 500
 
-    return jsonify({"message": "User registered successfully"}), 201
+     # Create JWT token
+    access_token = create_access_token(identity=email)
+    return jsonify({"message": "User registered successfully", "access_token": access_token}), 201
 
 @app.route("/signin", methods=["POST"])
 def signin():
@@ -81,7 +85,35 @@ def signin():
     if not check_password_hash(user["password_text"], password):
         return jsonify({"message": "Invalid email or password"}), 401
 
-    return jsonify({"message": "Sign-in successful"}), 200
+    # Create JWT token
+    access_token = create_access_token(identity=email)
+    return jsonify({"access_token": access_token}), 200
+
+@app.route("/users", methods=["GET"])
+@jwt_required()  # Ensure only authenticated users can access this route
+def get_users():
+    try:
+        # Fetch the first 10 users (or fewer if there are less than 10)
+        users = users_collection.find().limit(10)
+
+        # Convert the cursor to a list
+        users_list = list(users)
+
+        # Clean the data (optional step to remove MongoDB-specific fields like _id)
+        for user in users_list:
+            user["_id"] = str(user["_id"])  # Convert ObjectId to string
+
+        return jsonify(users_list), 200
+    except Exception as e:
+        return jsonify({"message": f"Error retrieving users: {e}"}), 500
+
+
+@app.route("/protected", methods=["GET"])
+@jwt_required()
+def protected():
+    # Get the current user's email from the JWT token
+    current_user = get_jwt_identity()
+    return jsonify({"message": f"Welcome {current_user}!"}), 200
 
 # Add a post (admin use or initialization)
 @app.route("/add_post", methods=["POST"])
