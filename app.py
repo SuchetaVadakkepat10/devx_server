@@ -47,7 +47,7 @@ def signup():
 
     # Create new user record
     new_user = {
-        "email_1": email,  # Matching with your structure
+        "email_1    ": email,  # Matching with your structure
         "instagram_id": instagram_id,  # Matching with your structure
         "password_text": hashed_password,
     }
@@ -67,7 +67,7 @@ def signup():
 
      # Create JWT token
     access_token = create_access_token(identity=email)
-    return jsonify({"message": "User registered successfully", "access_token": access_token}), 201
+    return jsonify({"message": "User registered successfully", "access_token": access_token, "user_email":email}), 201
 
 @app.route("/signin", methods=["POST"])
 def signin():
@@ -95,7 +95,7 @@ def signin():
 
     # Create JWT token
     access_token = create_access_token(identity=email)
-    return jsonify({"access_token": access_token}), 200
+    return jsonify({"access_token": access_token, "user_email": email}), 200
 
 @app.route("/users", methods=["GET"])
 @jwt_required()  # Ensure only authenticated users can access this route
